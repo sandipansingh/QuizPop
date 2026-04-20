@@ -101,10 +101,15 @@ export const extractAvatarObjectKeyFromUrl = (avatarUrl) => {
     return null;
   }
 
-  const expectedPrefix = `${env.MINIO_PUBLIC_BASE_URL}/${env.MINIO_AVATARS_BUCKET}/`;
-  if (!avatarUrl.startsWith(expectedPrefix)) {
-    return null;
+  const proxyPrefix = `${env.SERVER_PUBLIC_BASE_URL}/api/user/avatar/object?key=`;
+  if (avatarUrl.startsWith(proxyPrefix)) {
+    return decodeURIComponent(avatarUrl.slice(proxyPrefix.length));
   }
 
-  return avatarUrl.slice(expectedPrefix.length);
+  const expectedPrefix = `${env.MINIO_PUBLIC_BASE_URL}/${env.MINIO_AVATARS_BUCKET}/`;
+  if (avatarUrl.startsWith(expectedPrefix)) {
+    return avatarUrl.slice(expectedPrefix.length);
+  }
+
+  return null;
 };

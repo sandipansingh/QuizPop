@@ -67,26 +67,18 @@ services:
 
   minio-init:
     image: minio/mc
-    container_name: quizpop-minio-init-prod
     restart: 'no'
     env_file:
       - .env
     entrypoint: >
       sh -c "
       echo 'Waiting for MinIO...' &&
-      endpoint_url=\"$${MINIO_ENDPOINT}\" &&
-      case \"$$endpoint_url\" in
-        http://*|https://*) ;;
-        *) endpoint_url=\"http://$$endpoint_url\" ;;
-      esac &&
-      until mc alias set shared \"$$endpoint_url\" \"$${MINIO_ACCESS_KEY}\" \"$${MINIO_SECRET_KEY}\"; do
+      until mc alias set shared \"$${MINIO_ENDPOINT}\" \"$${MINIO_ACCESS_KEY}\" \"$${MINIO_SECRET_KEY}\"; do
         sleep 2;
       done &&
       echo 'Connected to MinIO' &&
-      echo 'Creating bucket if not exists...' &&
-      mc mb shared/${MINIO_BUCKET} || true &&
-      echo 'Setting public access...' &&
-      mc anonymous set public shared/${MINIO_BUCKET} || true &&
+      mc mb shared/$${MINIO_BUCKET} || true &&
+      mc anonymous set public shared/$${MINIO_BUCKET} || true &&
       echo 'MinIO init done'
       "
     networks:
