@@ -1,0 +1,183 @@
+name: quizpop-dev
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: quizpop-server-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      SERVER_PUBLIC_BASE_URL: ${SERVER_PUBLIC_BASE_URL:-http://localhost:${SERVER_PORT:-4000}}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: ''
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USER: default
+      REDIS_PASSWORD: ''
+      CACHE_TTL_QUESTION_POOL_SECONDS: ${CACHE_TTL_QUESTION_POOL_SECONDS:-600}
+      CACHE_TTL_QUESTION_POOL_STALE_SECONDS: ${CACHE_TTL_QUESTION_POOL_STALE_SECONDS:-1800}
+      CACHE_TTL_LEADERBOARD_SECONDS: ${CACHE_TTL_LEADERBOARD_SECONDS:-45}
+      CACHE_TTL_LEADERBOARD_STALE_SECONDS: ${CACHE_TTL_LEADERBOARD_STALE_SECONDS:-180}
+      CACHE_TTL_USER_PROFILE_SECONDS: ${CACHE_TTL_USER_PROFILE_SECONDS:-300}
+      CACHE_TTL_USER_PROFILE_STALE_SECONDS: ${CACHE_TTL_USER_PROFILE_STALE_SECONDS:-900}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_REGION: ${MINIO_REGION:-local-1}
+      MINIO_USE_SSL: false
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-avatars}
+      MINIO_AVATARS_BUCKET: ${MINIO_AVATARS_BUCKET:-avatars}
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-http://localhost:${MINIO_API_PORT:-9000}}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${CLIENT_PORT:-5173}}
+      SOCKET_CORS_ORIGIN: ${SOCKET_CORS_ORIGIN:-http://localhost:${CLIENT_PORT:-5173}}
+    command: >
+      sh -c "npm run prisma:deploy-or-push && npm run prisma:seed && npm run dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - '${SERVER_PORT:-4000}:4000'
+    volumes:
+      - ./apps/server:/app/apps/server
+      - /app/apps/server/node_modules
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+      target: development
+    container_name: quizpop-client-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CHOKIDAR_USEPOLLING: 'true'
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${SERVER_PORT:-4000}/api}
+      VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:${SERVER_PORT:-4000}}
+      VITE_CSRF_COOKIE_NAME: ${VITE_CSRF_COOKIE_NAME:-quizpop_csrf_token}
+      VITE_API_REQUEST_TIMEOUT_MS: ${VITE_API_REQUEST_TIMEOUT_MS:-20000}
+      VITE_TOAST_DURATION_MS: ${VITE_TOAST_DURATION_MS:-3600}
+      VITE_DEFAULT_QUESTION_LIMIT: ${VITE_DEFAULT_QUESTION_LIMIT:-10}
+      VITE_QUIZ_QUESTION_TIME_LIMIT_MS: ${VITE_QUIZ_QUESTION_TIME_LIMIT_MS:-30000}
+      VITE_ROOM_QUESTION_TIME_LIMIT_MS: ${VITE_ROOM_QUESTION_TIME_LIMIT_MS:-25000}
+    depends_on:
+      - server
+    ports:
+      - '${CLIENT_PORT:-5173}:5173'
+    volumes:
+      - ./apps/client:/app/apps/client
+      - /app/apps/client/node_modules
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: quizpop-postgres-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '${POSTGRES_PORT}:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: shared_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      TZ: ${TZ}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+
+  minio-init:
+    image: minio/mc
+    container_name: quizpop-minio-init-dev
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_AVATARS_BUCKET: ${MINIO_AVATARS_BUCKET:-avatars}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
+        echo 'Waiting for MinIO...';
+      done;
+      mc mb --ignore-existing local/$$MINIO_AVATARS_BUCKET;
+      mc anonymous set download local/$$MINIO_AVATARS_BUCKET;
+      echo 'MinIO bucket ready: '$$MINIO_AVATARS_BUCKET;
+      "
+    restart: 'no'
+
+  redis:
+    image: redis:7-alpine
+    container_name: quizpop-redis-dev
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --requirepass
+      - ${REDIS_PASSWORD:-quizpop_dev_redis}
+    environment:
+      TZ: ${TZ}
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'redis-cli',
+          '-a',
+          '${REDIS_PASSWORD:-quizpop_dev_redis}',
+          'ping',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  minio_data:
+  redis_dev_data:

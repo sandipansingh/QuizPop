@@ -1,0 +1,93 @@
+name: quizpop-prod-shared
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: quizpop-server-prod-shared
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      SERVER_PUBLIC_BASE_URL: ${SERVER_PUBLIC_BASE_URL:-http://localhost:${SERVER_PORT:-4000}}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-}
+      REDIS_HOST: ${REDIS_HOST:-localhost}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_USER: ${REDIS_USER:-default}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      CACHE_TTL_QUESTION_POOL_SECONDS: ${CACHE_TTL_QUESTION_POOL_SECONDS:-600}
+      CACHE_TTL_QUESTION_POOL_STALE_SECONDS: ${CACHE_TTL_QUESTION_POOL_STALE_SECONDS:-1800}
+      CACHE_TTL_LEADERBOARD_SECONDS: ${CACHE_TTL_LEADERBOARD_SECONDS:-45}
+      CACHE_TTL_LEADERBOARD_STALE_SECONDS: ${CACHE_TTL_LEADERBOARD_STALE_SECONDS:-180}
+      CACHE_TTL_USER_PROFILE_SECONDS: ${CACHE_TTL_USER_PROFILE_SECONDS:-300}
+      CACHE_TTL_USER_PROFILE_STALE_SECONDS: ${CACHE_TTL_USER_PROFILE_STALE_SECONDS:-900}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_REGION: ${MINIO_REGION:-local-1}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-avatars}
+      MINIO_AVATARS_BUCKET: ${MINIO_AVATARS_BUCKET:-avatars}
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${CLIENT_PORT:-8080}}
+      SOCKET_CORS_ORIGIN: ${SOCKET_CORS_ORIGIN:-http://localhost:${CLIENT_PORT:-8080}}
+    command: >
+      sh -c "npm run prisma:deploy-or-push && npm run prisma:seed && npm run start"
+    ports:
+      - '${SERVER_PORT:-4000}:4000'
+    networks:
+      - default
+      - shared_infra
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/client/Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${SERVER_PORT:-4000}/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:${SERVER_PORT:-4000}}
+        VITE_CSRF_COOKIE_NAME: ${VITE_CSRF_COOKIE_NAME:-quizpop_csrf_token}
+        VITE_API_REQUEST_TIMEOUT_MS: ${VITE_API_REQUEST_TIMEOUT_MS:-20000}
+        VITE_TOAST_DURATION_MS: ${VITE_TOAST_DURATION_MS:-3600}
+        VITE_DEFAULT_QUESTION_LIMIT: ${VITE_DEFAULT_QUESTION_LIMIT:-10}
+        VITE_QUIZ_QUESTION_TIME_LIMIT_MS: ${VITE_QUIZ_QUESTION_TIME_LIMIT_MS:-30000}
+        VITE_ROOM_QUESTION_TIME_LIMIT_MS: ${VITE_ROOM_QUESTION_TIME_LIMIT_MS:-25000}
+    container_name: quizpop-client-prod-shared
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '${CLIENT_PORT:-8080}:80'
+
+  minio-init:
+    image: minio/mc
+    container_name: quizpop-minio-init-prod
+    restart: 'no'
+    env_file:
+      - .env
+    entrypoint: >
+      sh -c "
+      echo 'Waiting for MinIO...' &&
+      until mc alias set shared http://${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}; do
+        sleep 2;
+      done &&
+      echo 'Connected to MinIO' &&
+      echo 'Creating bucket if not exists...' &&
+      mc mb shared/${MINIO_BUCKET} || true &&
+      echo 'Setting public access...' &&
+      mc anonymous set public shared/${MINIO_BUCKET} || true &&
+      echo 'MinIO init done'
+      "
+    networks:
+      - shared_infra
+
+networks:
+  shared_infra:
+    external: true
+    name: ${SHARED_NETWORK:-shared_net}

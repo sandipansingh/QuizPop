@@ -1,0 +1,65 @@
+{
+  "name": "quizpop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QuizPop - Full-stack real-time multiplayer quiz platform with adaptive questions, ranking system, and leaderboards",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/quiz-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/quiz-app/issues"
+  },
+  "homepage": "https://github.com/yourusername/quiz-app#readme",
+  "author": "sandipansingh",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "quiz",
+    "multiplayer",
+    "real-time",
+    "gaming",
+    "competitive",
+    "leaderboard",
+    "websocket",
+    "socket.io",
+    "react",
+    "nodejs",
+    "postgresql",
+    "redis"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev:client": "npm run dev -w apps/client",
+    "dev:server": "npm run dev -w apps/server",
+    "dev": "npm run dev:server & npm run dev:client",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm run build -w apps/client",
+    "build:server": "npm run build -w apps/server",
+    "start": "npm run start -w apps/server",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "npm run lint -w apps/client",
+    "lint:server": "npm run lint -w apps/server",
+    "lint:fix": "npm run lint:client -- --fix && npm run lint:server -- --fix",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "prisma:generate": "npm run prisma:generate -w apps/server",
+    "prisma:migrate": "npm run prisma:migrate -w apps/server",
+    "prisma:deploy": "npm run prisma:deploy -w apps/server",
+    "prisma:seed": "npm run prisma:seed -w apps/server"
+  },
+  "workspaces": [
+    "apps/client",
+    "apps/server"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.3"
+  }
+}

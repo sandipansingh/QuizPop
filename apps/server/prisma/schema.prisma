@@ -1,0 +1,315 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Difficulty {
+  easy
+  medium
+  hard
+}
+
+enum RankTier {
+  Bronze
+  Silver
+  Gold
+  Platinum
+  Diamond
+}
+
+enum RoomStatus {
+  waiting
+  active
+  finished
+}
+
+enum ActivityType {
+  QUIZ_PLAYED
+  ROOM_CREATED
+  ROOM_JOINED
+  ACHIEVEMENT_UNLOCKED
+  STREAK_UPDATED
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+  blocked
+}
+
+model User {
+  id                    String   @id @default(uuid()) @db.Uuid
+  username              String   @unique @db.VarChar(30)
+  email                 String   @unique @db.VarChar(255)
+  password              String
+  avatar_url            String?
+  bio                   String?  @db.VarChar(280)
+  total_score           Int      @default(0)
+  total_quizzes_played  Int      @default(0)
+  total_correct_answers Int      @default(0)
+  total_wrong_answers   Int      @default(0)
+  accuracy_percentage   Decimal  @default(0.0) @db.Decimal(5, 2)
+  average_time_per_question Decimal @default(0.0) @db.Decimal(10, 2)
+  rank                  RankTier @default(Silver)
+  rating_points         Int      @default(1000)
+  xp_points             Int      @default(0)
+  level                 Int      @default(1)
+  current_streak        Int      @default(0)
+  longest_streak        Int      @default(0)
+  last_streak_date      DateTime?
+  last_active_at        DateTime @default(now())
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  attempts                 QuizAttempt[]
+  leaderboard              Leaderboard?
+  rooms_hosted             Room[]                 @relation("RoomHost")
+  room_players             RoomPlayer[]
+  activities               ActivityLog[]
+  achievements             UserAchievement[]
+  question_history         UserQuestionHistory[]
+  category_performance     UserCategoryPerformance[]
+  sent_friend_requests     Friendship[]           @relation("FriendRequester")
+  received_friend_requests Friendship[]           @relation("FriendRecipient")
+  match_history            MatchHistory[]
+  refresh_token_sessions   RefreshTokenSession[]
+
+  @@index([rating_points])
+  @@index([rank])
+  @@index([created_at])
+  @@map("users")
+}
+
+model Question {
+  id             String     @id @default(uuid()) @db.Uuid
+  question_text  String
+  options        Json
+  correct_answer String
+  difficulty     Difficulty
+  category       String     @db.VarChar(100)
+  tags           String[]
+  created_at     DateTime   @default(now())
+
+  answers Answer[]
+  history_entries UserQuestionHistory[]
+
+  @@index([category])
+  @@index([difficulty])
+  @@map("questions")
+}
+
+model QuizAttempt {
+  id               String   @id @default(uuid()) @db.Uuid
+  user_id          String   @db.Uuid
+  room_id          String?
+  score            Int      @default(0)
+  total_questions  Int
+  correct_answers  Int      @default(0)
+  wrong_answers    Int      @default(0)
+  time_taken       Int
+  rating_change    Int      @default(0)
+  xp_earned        Int      @default(0)
+  average_response Float    @default(0)
+  created_at       DateTime @default(now())
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  answers Answer[]
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([room_id])
+  @@map("quiz_attempts")
+}
+
+model Answer {
+  id              String   @id @default(uuid()) @db.Uuid
+  attempt_id      String   @db.Uuid
+  question_id     String   @db.Uuid
+  selected_answer String
+  is_correct      Boolean
+  time_taken      Int
+  created_at      DateTime @default(now())
+
+  attempt  QuizAttempt @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [question_id], references: [id], onDelete: Restrict)
+
+  @@index([attempt_id])
+  @@index([question_id])
+  @@map("answers")
+}
+
+model UserQuestionHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String   @db.Uuid
+  question_id String   @db.Uuid
+  room_id     String?
+  mode        String   @db.VarChar(16)
+  seen_at     DateTime @default(now())
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, seen_at])
+  @@index([question_id])
+  @@index([room_id])
+  @@map("user_question_history")
+}
+
+model Leaderboard {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @unique @db.Uuid
+  global_rank  Int?
+  weekly_rank  Int?
+  monthly_rank Int?
+  last_updated DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([global_rank])
+  @@index([weekly_rank])
+  @@index([monthly_rank])
+  @@map("leaderboard")
+}
+
+model Room {
+  id         String     @id @default(cuid())
+  host_id    String     @db.Uuid
+  status     RoomStatus @default(waiting)
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+
+  host    User         @relation("RoomHost", fields: [host_id], references: [id], onDelete: Cascade)
+  players RoomPlayer[]
+
+  @@index([host_id])
+  @@index([status])
+  @@map("rooms")
+}
+
+model RoomPlayer {
+  id         String   @id @default(uuid()) @db.Uuid
+  room_id    String
+  user_id    String   @db.Uuid
+  score      Int      @default(0)
+  joined_at  DateTime @default(now())
+  is_online  Boolean  @default(true)
+
+  room Room @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+  @@map("room_players")
+}
+
+model Achievement {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(50)
+  title       String   @db.VarChar(120)
+  description String
+  xp_reward   Int      @default(0)
+  created_at  DateTime @default(now())
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String   @db.Uuid
+  achievement_id String   @db.Uuid
+  unlocked_at    DateTime @default(now())
+
+  user        User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, achievement_id])
+  @@index([user_id])
+  @@map("user_achievements")
+}
+
+model ActivityLog {
+  id           String       @id @default(uuid()) @db.Uuid
+  user_id      String       @db.Uuid
+  type         ActivityType
+  description  String
+  metadata     Json?
+  occurred_at  DateTime     @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, occurred_at])
+  @@map("activity_logs")
+}
+
+model UserCategoryPerformance {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  category        String   @db.VarChar(100)
+  total_attempts  Int      @default(0)
+  correct_answers Int      @default(0)
+  wrong_answers   Int      @default(0)
+  accuracy        Decimal  @default(0.0) @db.Decimal(5, 2)
+  updated_at      DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, category])
+  @@index([category])
+  @@map("user_category_performance")
+}
+
+model Friendship {
+  id             String           @id @default(uuid()) @db.Uuid
+  requester_id   String           @db.Uuid
+  recipient_id   String           @db.Uuid
+  status         FriendshipStatus @default(pending)
+  created_at     DateTime         @default(now())
+  accepted_at    DateTime?
+
+  requester User @relation("FriendRequester", fields: [requester_id], references: [id], onDelete: Cascade)
+  recipient User @relation("FriendRecipient", fields: [recipient_id], references: [id], onDelete: Cascade)
+
+  @@unique([requester_id, recipient_id])
+  @@index([recipient_id, status])
+  @@map("friendships")
+}
+
+model MatchHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @db.Uuid
+  room_id      String?
+  score        Int      @default(0)
+  result       String   @db.VarChar(20)
+  played_at    DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, played_at])
+  @@map("match_history")
+}
+
+model RefreshTokenSession {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  token_jti       String   @unique
+  token_hash      String
+  expires_at      DateTime
+  revoked_at      DateTime?
+  replaced_by_jti String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@index([revoked_at])
+  @@map("refresh_token_sessions")
+}
