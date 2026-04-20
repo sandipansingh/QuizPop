@@ -47,9 +47,14 @@ const QUESTION_SELECT = {
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+const toUuidArraySql = (values = []) =>
+  Prisma.sql`ARRAY[${Prisma.join(values)}]::uuid[]`;
+
+const toDifficultyArraySql = (values = []) =>
+  Prisma.sql`ARRAY[${Prisma.join(values)}]::"Difficulty"[]`;
+
 const shuffleArray = (values = []) => {
   const shuffled = [...values];
-
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = randomInt(index + 1);
     [shuffled[index], shuffled[swapIndex]] = [
@@ -176,13 +181,13 @@ const buildQuestionQuery = async ({
   }
 
   const difficultyClause = difficulties?.length
-    ? Prisma.sql`AND q.difficulty IN (${Prisma.join(difficulties)})`
+    ? Prisma.sql`AND q.difficulty = ANY(${toDifficultyArraySql(difficulties)})`
     : Prisma.empty;
   const categoryClause = category
     ? Prisma.sql`AND q.category = ${category}`
     : Prisma.empty;
   const exclusionClause = excludedQuestionIds?.length
-    ? Prisma.sql`AND q.id NOT IN (${Prisma.join(excludedQuestionIds)})`
+    ? Prisma.sql`AND q.id <> ALL(${toUuidArraySql(excludedQuestionIds)})`
     : Prisma.empty;
 
   return prisma.$queryRaw`
@@ -220,10 +225,10 @@ const buildOldestHistoryQuestionQuery = async ({
     ? Prisma.sql`AND q.category = ${category}`
     : Prisma.empty;
   const difficultyClause = difficulties?.length
-    ? Prisma.sql`AND q.difficulty IN (${Prisma.join(difficulties)})`
+    ? Prisma.sql`AND q.difficulty = ANY(${toDifficultyArraySql(difficulties)})`
     : Prisma.empty;
   const exclusionClause = excludedQuestionIds?.length
-    ? Prisma.sql`AND q.id NOT IN (${Prisma.join(excludedQuestionIds)})`
+    ? Prisma.sql`AND q.id <> ALL(${toUuidArraySql(excludedQuestionIds)})`
     : Prisma.empty;
 
   return prisma.$queryRaw`
@@ -238,7 +243,7 @@ const buildOldestHistoryQuestionQuery = async ({
       MIN(h.seen_at) AS first_seen_at
     FROM user_question_history h
     JOIN questions q ON q.id = h.question_id
-    WHERE h.user_id IN (${Prisma.join(userIds)})
+    WHERE h.user_id = ANY(${toUuidArraySql(userIds)})
       ${categoryClause}
       ${difficultyClause}
       ${exclusionClause}
@@ -410,7 +415,7 @@ const calculateHistoryCoverageRatio = async (userId) => {
     prisma.$queryRaw`
       SELECT COUNT(DISTINCT question_id)::int AS count
       FROM user_question_history
-      WHERE user_id = ${userId}
+      WHERE user_id = CAST(${userId} AS UUID)
     `,
   ]);
 
