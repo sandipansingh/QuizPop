@@ -6,6 +6,24 @@ import { env } from '../config/env.js';
 const resolveMinioConnection = () => {
   const endpoint = String(env.MINIO_ENDPOINT || '').trim();
 
+  if (!endpoint) {
+    return {
+      endPoint: 'localhost',
+      port: env.MINIO_PORT,
+    };
+  }
+
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+    const parsedUrl = new URL(endpoint);
+
+    return {
+      endPoint: parsedUrl.hostname,
+      port: parsedUrl.port
+        ? Number.parseInt(parsedUrl.port, 10)
+        : env.MINIO_PORT,
+    };
+  }
+
   if (!endpoint.includes(':')) {
     return {
       endPoint: endpoint,

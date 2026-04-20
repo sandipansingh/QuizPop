@@ -20,7 +20,9 @@ import {
 
 export const createApp = () => {
   const app = express();
-  const openApiDocument = buildOpenApiDocument({ port: env.PORT });
+  const openApiDocument = buildOpenApiDocument({
+    serverBaseUrl: env.SERVER_PUBLIC_BASE_URL,
+  });
   const allowedOrigins = env.CORS_ORIGIN.split(',')
     .map((item) => item.trim())
     .filter(Boolean);

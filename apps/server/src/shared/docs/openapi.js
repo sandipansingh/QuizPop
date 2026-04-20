@@ -13,7 +13,7 @@ const buildStandardErrorResponses = () => ({
   500: { $ref: '#/components/responses/InternalServerError' },
 });
 
-export const buildOpenApiDocument = ({ port }) => ({
+export const buildOpenApiDocument = ({ serverBaseUrl }) => ({
   openapi: '3.1.0',
   info: {
     title: 'QuizPop API',
@@ -23,8 +23,8 @@ export const buildOpenApiDocument = ({ port }) => ({
   },
   servers: [
     {
-      url: `http://localhost:${port}`,
-      description: 'Local development server',
+      url: serverBaseUrl,
+      description: 'Configured API base URL',
     },
   ],
   tags: [

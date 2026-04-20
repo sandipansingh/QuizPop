@@ -25,7 +25,7 @@ services:
       CACHE_TTL_LEADERBOARD_STALE_SECONDS: ${CACHE_TTL_LEADERBOARD_STALE_SECONDS:-180}
       CACHE_TTL_USER_PROFILE_SECONDS: ${CACHE_TTL_USER_PROFILE_SECONDS:-300}
       CACHE_TTL_USER_PROFILE_STALE_SECONDS: ${CACHE_TTL_USER_PROFILE_STALE_SECONDS:-900}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-shared_minio:9000}
       MINIO_PORT: ${MINIO_PORT:-9000}
       MINIO_REGION: ${MINIO_REGION:-local-1}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
@@ -74,7 +74,12 @@ services:
     entrypoint: >
       sh -c "
       echo 'Waiting for MinIO...' &&
-      until mc alias set shared http://${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}; do
+      endpoint_url=\"$${MINIO_ENDPOINT}\" &&
+      case \"$$endpoint_url\" in
+        http://*|https://*) ;;
+        *) endpoint_url=\"http://$$endpoint_url\" ;;
+      esac &&
+      until mc alias set shared \"$$endpoint_url\" \"$${MINIO_ACCESS_KEY}\" \"$${MINIO_SECRET_KEY}\"; do
         sleep 2;
       done &&
       echo 'Connected to MinIO' &&
