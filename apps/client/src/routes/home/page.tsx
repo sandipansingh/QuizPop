@@ -1,11 +1,10 @@
-import { ArrowRight, Flag, PlusCircle, Users } from 'lucide-react';
+import { ArrowRight, PlusCircle, Users } from 'lucide-react';
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../app/store/auth.store';
 import { useRoomStore } from '../../app/store/room.store';
 import { usePageMeta } from '../../shared/hooks/usePageMeta';
-import { formatPercentage } from '../../shared/utils/formatters';
 import { createProfilePathBuilder } from '../../shared/utils/path.utils';
 import { normalizeOverviewStats } from '../../shared/utils/profile.utils';
 import { Button } from '../_shared/components/Button';
@@ -13,6 +12,8 @@ import { Card } from '../_shared/components/Card';
 import { FormMessage } from '../_shared/components/FormMessage';
 import { InputField } from '../_shared/components/InputField';
 import { useHomePageStore } from './store';
+import { HomeStatsCard } from './components/HomeStatsCard';
+import { HomeTopPlayers } from './components/HomeTopPlayers';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -53,7 +54,6 @@ export default function HomePage() {
       } | null
     )?.overview
   );
-
   const getProfilePath = createProfilePathBuilder({
     currentUserId,
     currentUsername,
@@ -136,64 +136,12 @@ export default function HomePage() {
         </Card>
 
         <div className="grid gap-4">
-          <Card accent="mint">
-            <h2 className="text-xl font-heading">My Snapshot</h2>
-            <div className="mt-3.5 grid grid-cols-2 gap-3">
-              {[
-                { label: 'Quizzes', value: safeStats.total_quizzes_played },
-                { label: 'Total Score', value: safeStats.total_score },
-                {
-                  label: 'Accuracy',
-                  value: formatPercentage(safeStats.accuracy_percentage),
-                },
-                {
-                  label: 'Current Streak',
-                  value: `${safeStats.current_streak} days`,
-                },
-              ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="border-2 border-border rounded-md p-2.5 bg-muted"
-                >
-                  <span className="block text-[0.75rem] uppercase tracking-[0.08em] text-muted-fg">
-                    {label}
-                  </span>
-                  <strong className="text-[1.1rem] font-heading">
-                    {value}
-                  </strong>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3.5 inline-flex items-center gap-2">
-              <Flag size={16} /> Rank: <strong>{safeStats.rank}</strong>
-            </p>
-          </Card>
-
-          <Card accent="pink">
-            <h2 className="text-xl font-heading">Top Players</h2>
-            {isLoadingSnapshot ? (
-              <p className="text-muted-fg">Loading leaderboard...</p>
-            ) : !leaderboard.length ? (
-              <p className="text-muted-fg">No leaderboard entries yet.</p>
-            ) : (
-              <ol className="mt-3.5 p-0 list-none grid gap-2">
-                {leaderboard.map((player) => (
-                  <li
-                    key={player.user_id}
-                    className="flex justify-between items-center border-2 border-border rounded-md px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-muted)_80%,transparent)]"
-                  >
-                    <Link
-                      to={getProfilePath(player.user_id, player.username)}
-                      className="no-underline font-bold hover:underline"
-                    >
-                      {player.username}
-                    </Link>
-                    <strong>{player.total_score}</strong>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </Card>
+          <HomeStatsCard stats={safeStats} />
+          <HomeTopPlayers
+            players={leaderboard}
+            isLoading={isLoadingSnapshot}
+            getProfilePath={getProfilePath}
+          />
         </div>
       </div>
     </section>

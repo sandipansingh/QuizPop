@@ -13,6 +13,7 @@ import { Card } from '../_shared/components/Card';
 import { FormMessage } from '../_shared/components/FormMessage';
 import { quizPageService } from '../quiz/service';
 import { useResultPageStore } from './store';
+import { ResultStatsGrid } from './components/ResultStatsGrid';
 
 export default function ResultPage() {
   const navigate = useNavigate();
@@ -40,11 +41,6 @@ export default function ResultPage() {
     currentUsername,
   });
 
-  const handlePlayAgainSoloMode = () => {
-    quizPageService.resetQuiz();
-    navigate('/quiz');
-  };
-
   return (
     <section className="grid place-items-center">
       <Card className="w-[min(980px,100%)]" accent="pink">
@@ -57,8 +53,8 @@ export default function ResultPage() {
         <FormMessage message={errorMessage} tone="error" />
 
         {mode === 'solo' && solo ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 max-[960px]:grid-cols-1">
-            {[
+          <ResultStatsGrid
+            items={[
               { label: 'Final Score', value: solo.score },
               {
                 label: 'Accuracy',
@@ -77,42 +73,20 @@ export default function ResultPage() {
                   solo.average_response * solo.total_questions
                 ),
               },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="rounded-md border-2 border-foreground p-3 bg-muted"
-              >
-                <span className="block text-[0.78rem] uppercase tracking-[0.12em] text-muted-fg">
-                  {label}
-                </span>
-                <strong className="text-[1.25rem] font-heading">{value}</strong>
-              </div>
-            ))}
-          </div>
+            ]}
+          />
         ) : null}
 
         {mode === 'room' && multiplayer ? (
           <>
-            <div className="mt-4 grid grid-cols-2 gap-3 max-[960px]:grid-cols-1">
-              {[
+            <ResultStatsGrid
+              items={[
                 { label: 'My Rank', value: multiplayer.myEntry?.rank ?? 'NA' },
                 { label: 'My Score', value: multiplayer.myEntry?.score ?? 0 },
                 { label: 'Room', value: multiplayer.roomId ?? 'Unknown' },
                 { label: 'Players', value: multiplayer.leaderboard.length },
-              ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="rounded-md border-2 border-foreground p-3 bg-muted"
-                >
-                  <span className="block text-[0.78rem] uppercase tracking-[0.12em] text-muted-fg">
-                    {label}
-                  </span>
-                  <strong className="text-[1.25rem] font-heading">
-                    {value}
-                  </strong>
-                </div>
-              ))}
-            </div>
+              ]}
+            />
             <ol className="mt-4 p-0 list-none grid gap-2">
               {multiplayer.leaderboard.map((entry) => (
                 <li
@@ -136,7 +110,13 @@ export default function ResultPage() {
         ) : null}
 
         <div className="mt-5 flex gap-2.5 flex-wrap max-[960px]:flex-col">
-          <Button onClick={handlePlayAgainSoloMode} icon={<Play size={18} />}>
+          <Button
+            onClick={() => {
+              quizPageService.resetQuiz();
+              navigate('/quiz');
+            }}
+            icon={<Play size={18} />}
+          >
             Play Solo
           </Button>
           <Button

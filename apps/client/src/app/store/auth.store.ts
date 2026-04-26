@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { authService } from '../../shared/services/auth.service';
 import {
   clearAuthTokens,
-  readAuthTokens,
   writeAuthTokens,
 } from '../../shared/api/token-storage';
+import { initializeAuthSession } from './auth.init';
 import type { User, AuthPayload } from '../../shared/types';
 
 interface AuthState {
@@ -41,7 +41,6 @@ const withSession = (
   payload: AuthPayload
 ): void => {
   writeAuthTokens({ accessToken: payload.access_token });
-
   set({
     user: payload.user,
     accessToken: payload.access_token,
@@ -65,62 +64,11 @@ const clearSessionState = (
 export const useAuthStore = create<AuthState>((set, get) => ({
   ...baseState,
 
-  initializeAuthSession: async () => {
-    if (get().isInitialized || get().isInitializing) {
-      return;
-    }
-
-    set({ isInitializing: true, errorMessage: null });
-    const storedTokens = readAuthTokens();
-
-    if (storedTokens.accessToken) {
-      set({
-        accessToken: storedTokens.accessToken,
-        isAuthenticated: true,
-      });
-    }
-
-    let attemptedRefresh = false;
-
-    try {
-      if (!storedTokens.accessToken) {
-        attemptedRefresh = true;
-        const refreshed = await authService.refresh();
-        writeAuthTokens({ accessToken: refreshed.access_token });
-
-        set({
-          accessToken: refreshed.access_token,
-          isAuthenticated: true,
-        });
-      }
-
-      const profile = await authService.getProfile();
-      set({ user: profile, isInitialized: true, isInitializing: false });
-      return;
-    } catch {
-      if (!attemptedRefresh) {
-        try {
-          const refreshed = await authService.refresh();
-          writeAuthTokens({ accessToken: refreshed.access_token });
-          const profile = await authService.getProfile();
-          set({
-            user: profile,
-            accessToken: refreshed.access_token,
-            isAuthenticated: true,
-            isInitialized: true,
-            isInitializing: false,
-          });
-          return;
-        } catch {
-          clearSessionState(set);
-        }
-      } else {
-        clearSessionState(set);
-      }
-    }
-
-    set({ isInitialized: true, isInitializing: false });
-  },
+  initializeAuthSession: () =>
+    initializeAuthSession(
+      set as (partial: Record<string, unknown>) => void,
+      get as () => { isInitialized: boolean; isInitializing: boolean }
+    ),
 
   login: async (payload) => {
     set({ errorMessage: null });
@@ -144,7 +92,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Always clear local session, even if logout fails.
       }
     }
-
     clearSessionState(set);
   },
 

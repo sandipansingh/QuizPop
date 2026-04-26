@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../app/store/auth.store';
 import { usePageMeta } from '../../shared/hooks/usePageMeta';
 import { leaderboardService } from '../../shared/services/leaderboard.service';
-import { formatPercentage } from '../../shared/utils/formatters';
 import { createProfilePathBuilder } from '../../shared/utils/path.utils';
 import type { LeaderboardRow } from '../../shared/types';
 import { Button } from '../_shared/components/Button';
 import { Card } from '../_shared/components/Card';
 import { FormMessage } from '../_shared/components/FormMessage';
 import { RouteSpinner } from '../_shared/components/RouteSpinner';
+import { LeaderboardTable } from './components/LeaderboardTable';
 
 const PAGE_SIZE = 10;
 
@@ -96,63 +95,10 @@ export default function LeaderboardPage() {
         {!leaderboardRows.length ? (
           <p className="text-muted-fg mt-4">No leaderboard entries yet.</p>
         ) : (
-          <div
-            className="mt-4 overflow-x-auto border-2 border-border rounded-md bg-white"
-            role="region"
-            aria-label="Top players leaderboard"
-          >
-            <table className="w-full border-collapse min-w-[680px]">
-              <thead>
-                <tr>
-                  {[
-                    '#',
-                    'Player',
-                    'Score',
-                    'Accuracy',
-                    'Quizzes',
-                    'Rank Tier',
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      scope="col"
-                      className="text-left px-3 py-2.5 border-b border-border bg-[color-mix(in_srgb,var(--color-muted)_70%,#ffffff)] text-[0.8rem] uppercase tracking-[0.06em]"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboardRows.map((player) => (
-                  <tr key={player.user_id}>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      {player.global_rank}
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      <Link
-                        to={getProfilePath(player.user_id, player.username)}
-                        className="font-bold no-underline hover:underline"
-                      >
-                        {player.username}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      {player.total_score}
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      {formatPercentage(player.accuracy_percentage)}
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      {player.total_quizzes_played}
-                    </td>
-                    <td className="px-3 py-2.5 border-b border-border">
-                      {player.rank}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <LeaderboardTable
+            rows={leaderboardRows}
+            getProfilePath={getProfilePath}
+          />
         )}
 
         <div

@@ -42,9 +42,7 @@ export default function CookiePolicyPage() {
             },
           ].map(({ title, body }) => (
             <div key={title}>
-              <h2 className="mt-2 text-[1.25rem] font-heading">
-                {title}
-              </h2>
+              <h2 className="mt-2 text-[1.25rem] font-heading">{title}</h2>
               <p className="text-muted-fg">{body}</p>
             </div>
           ))}

@@ -5,7 +5,10 @@ interface ProfileAvatarBlockProps {
   username?: string;
 }
 
-export function ProfileAvatarBlock({ avatarUrl, username }: ProfileAvatarBlockProps) {
+export function ProfileAvatarBlock({
+  avatarUrl,
+  username,
+}: ProfileAvatarBlockProps) {
   return (
     <div className="flex justify-start">
       {avatarUrl ? (
