@@ -1,3 +1,5 @@
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../app/store/auth.store';
@@ -6,8 +8,13 @@ import { Button } from '../_shared/components/Button';
 import { Card } from '../_shared/components/Card';
 import { FormMessage } from '../_shared/components/FormMessage';
 import { InputField } from '../_shared/components/InputField';
-import { submitAuthForm } from '../_shared/utils/submitAuthForm';
-import { useLoginPageStore } from './store';
+import {
+  loginSchema,
+  type LoginFormData,
+} from '../../shared/validation/auth.schemas';
+import { authService } from '../../shared/services/auth.service';
+import { getGeneralErrorMessage } from '../../shared/utils/error-mapper';
+import type { ApiError } from '../../shared/api/response';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -20,13 +27,18 @@ export default function LoginPage() {
       'Sign in to QuizPop to continue your streak, enter multiplayer quiz rooms, and track your leaderboard progress.',
   });
 
-  const email = useLoginPageStore((state) => state.email);
-  const password = useLoginPageStore((state) => state.password);
-  const errors = useLoginPageStore((state) => state.errors);
-  const errorMessage = useLoginPageStore((state) => state.errorMessage);
-  const isSubmitting = useLoginPageStore((state) => state.isSubmitting);
-  const setField = useLoginPageStore((state) => state.setField);
-  const submit = useLoginPageStore((state) => state.submit);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
   if (isAuthenticated) return <Navigate to="/home" replace />;
 
@@ -34,18 +46,18 @@ export default function LoginPage() {
     (location.state as { from?: { pathname?: string } } | null)?.from
       ?.pathname ?? '/home';
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    await submitAuthForm({
-      event,
-      submit,
-      onSuccess: () => {
-        toast.success('Welcome back. Ready to play?');
-        navigate(fromPath, { replace: true });
-      },
-      onFailure: () => {
-        toast.error('Login failed. Check your credentials.');
-      },
-    });
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      await authService.login(data);
+      toast.success('Welcome back. Ready to play?');
+      navigate(fromPath, { replace: true });
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError('root', {
+        message: getGeneralErrorMessage(apiError),
+      });
+      toast.error('Login failed. Check your credentials.');
+    }
   };
 
   return (
@@ -70,28 +82,30 @@ export default function LoginPage() {
         <p className="text-muted-fg mt-3">
           Real-time rooms, live rankings, and smooth solo practice sessions.
         </p>
-        <form className="mt-4 grid gap-3.5" onSubmit={handleSubmit} noValidate>
+        <form
+          className="mt-4 grid gap-3.5"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           <InputField
             id="login-email"
             type="email"
             autoComplete="email"
             label="Email"
-            value={email}
-            error={errors.email}
+            error={errors.email?.message}
             placeholder="you@example.com"
-            onChange={(e) => setField('email', e.target.value)}
+            {...register('email')}
           />
           <InputField
             id="login-password"
             type="password"
             autoComplete="current-password"
             label="Password"
-            value={password}
-            error={errors.password}
+            error={errors.password?.message}
             placeholder="At least 8 characters"
-            onChange={(e) => setField('password', e.target.value)}
+            {...register('password')}
           />
-          <FormMessage message={errorMessage} tone="error" />
+          <FormMessage message={errors.root?.message} tone="error" />
           <Button type="submit" loading={isSubmitting}>
             Sign In
           </Button>

@@ -1,3 +1,5 @@
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../app/store/auth.store';
@@ -6,8 +8,13 @@ import { Button } from '../_shared/components/Button';
 import { Card } from '../_shared/components/Card';
 import { FormMessage } from '../_shared/components/FormMessage';
 import { InputField } from '../_shared/components/InputField';
-import { submitAuthForm } from '../_shared/utils/submitAuthForm';
-import { useRegisterPageStore } from './store';
+import {
+  registerSchema,
+  type RegisterFormData,
+} from '../../shared/validation/auth.schemas';
+import { authService } from '../../shared/services/auth.service';
+import { getGeneralErrorMessage } from '../../shared/utils/error-mapper';
+import type { ApiError } from '../../shared/api/response';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -19,33 +26,40 @@ export default function RegisterPage() {
       'Create your QuizPop account to start playing timed quizzes, build your profile, and climb the rankings.',
   });
 
-  const username = useRegisterPageStore((state) => state.username);
-  const email = useRegisterPageStore((state) => state.email);
-  const password = useRegisterPageStore((state) => state.password);
-  const confirmPassword = useRegisterPageStore(
-    (state) => state.confirmPassword
-  );
-  const bio = useRegisterPageStore((state) => state.bio);
-  const errors = useRegisterPageStore((state) => state.errors);
-  const errorMessage = useRegisterPageStore((state) => state.errorMessage);
-  const isSubmitting = useRegisterPageStore((state) => state.isSubmitting);
-  const setField = useRegisterPageStore((state) => state.setField);
-  const submit = useRegisterPageStore((state) => state.submit);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      bio: '',
+    },
+  });
 
   if (isAuthenticated) return <Navigate to="/home" replace />;
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    await submitAuthForm({
-      event,
-      submit,
-      onSuccess: () => {
-        toast.success('Account created. You are now signed in.');
-        navigate('/home', { replace: true });
-      },
-      onFailure: () => {
-        toast.error('Could not create account.');
-      },
-    });
+  const onSubmit = async (data: RegisterFormData) => {
+    try {
+      const { confirmPassword, ...payload } = data;
+      await authService.register({
+        ...payload,
+        bio: payload.bio || undefined,
+      });
+      toast.success('Account created. You are now signed in.');
+      navigate('/home', { replace: true });
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError('root', {
+        message: getGeneralErrorMessage(apiError),
+      });
+      toast.error('Could not create account.');
+    }
   };
 
   return (
@@ -71,56 +85,56 @@ export default function RegisterPage() {
           Start climbing live leaderboards with your own profile and streak
           stats.
         </p>
-        <form className="mt-4 grid gap-3.5" onSubmit={handleSubmit} noValidate>
+        <form
+          className="mt-4 grid gap-3.5"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           <InputField
             id="register-username"
             label="Username"
             autoComplete="username"
-            value={username}
-            error={errors.username}
+            error={errors.username?.message}
             placeholder="quiz_hero"
-            onChange={(e) => setField('username', e.target.value)}
+            {...register('username')}
           />
           <InputField
             id="register-email"
             type="email"
             label="Email"
             autoComplete="email"
-            value={email}
-            error={errors.email}
+            error={errors.email?.message}
             placeholder="you@example.com"
-            onChange={(e) => setField('email', e.target.value)}
+            {...register('email')}
           />
           <InputField
             id="register-password"
             type="password"
             label="Password"
             autoComplete="new-password"
-            value={password}
-            error={errors.password}
+            error={errors.password?.message}
             placeholder="At least 8 characters"
-            onChange={(e) => setField('password', e.target.value)}
+            {...register('password')}
           />
           <InputField
             id="register-confirm-password"
             type="password"
             label="Confirm Password"
             autoComplete="new-password"
-            value={confirmPassword}
-            error={errors.confirmPassword}
+            error={errors.confirmPassword?.message}
             placeholder="Repeat your password"
-            onChange={(e) => setField('confirmPassword', e.target.value)}
+            {...register('confirmPassword')}
           />
           <InputField
             id="register-bio"
             label="Bio (Optional)"
             maxLength={280}
-            value={bio}
+            error={errors.bio?.message}
             hint="Share your trivia superpower in one line."
             placeholder="Pop culture speedrunner"
-            onChange={(e) => setField('bio', e.target.value)}
+            {...register('bio')}
           />
-          <FormMessage message={errorMessage} tone="error" />
+          <FormMessage message={errors.root?.message} tone="error" />
           <Button type="submit" loading={isSubmitting}>
             Create Account
           </Button>

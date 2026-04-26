@@ -1,95 +1,84 @@
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
 import { Button } from '../../_shared/components/Button';
 import { FormMessage } from '../../_shared/components/FormMessage';
 import { InputField } from '../../_shared/components/InputField';
 import { userService } from '../../../shared/services/user.service';
-import toast from 'react-hot-toast';
-import { useState } from 'react';
-
-interface PasswordForm {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
+import {
+  changePasswordSchema,
+  type ChangePasswordFormData,
+} from '../../../shared/validation/user.schemas';
+import { getGeneralErrorMessage } from '../../../shared/utils/error-mapper';
+import type { ApiError } from '../../../shared/api/response';
 
 interface Props {
   onBack: () => void;
 }
 
-const DEFAULT_FORM: PasswordForm = {
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-};
-
 export function ProfilePasswordForm({ onBack }: Props) {
-  const [form, setForm] = useState<PasswordForm>(DEFAULT_FORM);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    reset,
+  } = useForm<ChangePasswordFormData>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
 
-  const onFieldChange =
-    (field: keyof PasswordForm) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((c) => ({ ...c, [field]: e.target.value }));
-      setErrorMessage('');
-    };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.newPassword.length < 8) {
-      setErrorMessage('New password must be at least 8 characters.');
-      return;
-    }
-    if (form.newPassword !== form.confirmPassword) {
-      setErrorMessage('New password and confirmation must match.');
-      return;
-    }
-    setIsChangingPassword(true);
-    setErrorMessage('');
+  const onSubmit = async (data: ChangePasswordFormData) => {
     try {
       await userService.changePassword({
-        current_password: form.currentPassword,
-        new_password: form.newPassword,
+        current_password: data.currentPassword,
+        new_password: data.newPassword,
       });
-      setForm(DEFAULT_FORM);
+      reset();
       toast.success('Password changed successfully.');
     } catch (err) {
-      setErrorMessage(
-        (err as { message?: string }).message ?? 'Could not change password.'
-      );
-    } finally {
-      setIsChangingPassword(false);
+      const apiError = err as ApiError;
+      setError('root', {
+        message: getGeneralErrorMessage(apiError),
+      });
+      toast.error('Could not change password.');
     }
   };
 
   return (
     <>
       <h2 className="text-2xl font-heading">Change Password</h2>
-      <form className="mt-2.5 grid gap-3" onSubmit={handleSubmit}>
+      <form className="mt-2.5 grid gap-3" onSubmit={handleSubmit(onSubmit)}>
         <InputField
           id="current-password"
           type="password"
           label="Current Password"
-          value={form.currentPassword}
-          onChange={onFieldChange('currentPassword')}
           autoComplete="current-password"
+          error={errors.currentPassword?.message}
+          {...register('currentPassword')}
         />
         <InputField
           id="new-password"
           type="password"
           label="New Password"
-          value={form.newPassword}
-          onChange={onFieldChange('newPassword')}
           autoComplete="new-password"
+          error={errors.newPassword?.message}
+          {...register('newPassword')}
         />
         <InputField
           id="confirm-password"
           type="password"
           label="Confirm New Password"
-          value={form.confirmPassword}
-          onChange={onFieldChange('confirmPassword')}
           autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          {...register('confirmPassword')}
         />
-        <FormMessage message={errorMessage} tone="error" />
-        <Button type="submit" loading={isChangingPassword}>
+        <FormMessage message={errors.root?.message} tone="error" />
+        <Button type="submit" loading={isSubmitting}>
           Update Password
         </Button>
         <button

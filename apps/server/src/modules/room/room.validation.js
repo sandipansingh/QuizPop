@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { joinRoomBodySchema } from '../../shared/validation/room.schemas.js';
 
 export const createRoomSchema = z.object({
   body: z.object({}),
@@ -7,9 +8,7 @@ export const createRoomSchema = z.object({
 });
 
 export const joinRoomSchema = z.object({
-  body: z.object({
-    room_id: z.string().min(1),
-  }),
+  body: joinRoomBodySchema,
   query: z.object({}).optional(),
   params: z.object({}).optional(),
 });

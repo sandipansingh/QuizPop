@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
+import { getLeaderboardQuerySchema } from '../../shared/validation/leaderboard.schemas.js';
 
 export const getLeaderboardSchema = z.object({
-  query: z.object({
-    page: z.coerce.number().int().positive().optional(),
+  query: getLeaderboardQuerySchema.extend({
     limit: z.coerce
       .number()
       .int()

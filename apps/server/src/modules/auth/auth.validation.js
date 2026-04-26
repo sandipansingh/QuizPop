@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   passwordSchema,
+  emailSchema,
   refreshTokenBodySchema,
   usernameSchema,
 } from '../../shared/validation/auth.schemas.js';
@@ -8,10 +9,10 @@ import {
 export const registerSchema = z.object({
   body: z.object({
     username: usernameSchema,
-    email: z.string().email(),
+    email: emailSchema,
     password: passwordSchema,
     avatar_url: z.string().url().optional(),
-    bio: z.string().max(280).optional(),
+    bio: z.string().max(280, 'Bio must be 280 characters or less.').optional(),
   }),
   params: z.object({}).optional(),
   query: z.object({}).optional(),
@@ -19,7 +20,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email(),
+    email: emailSchema,
     password: passwordSchema,
   }),
   params: z.object({}).optional(),

@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import {
-  passwordSchema,
   usernameSchema,
+  emailSchema,
 } from '../../shared/validation/auth.schemas.js';
+import {
+  bioSchema,
+  changePasswordSchema as changePasswordBodySchema,
+} from '../../shared/validation/user.schemas.js';
 
 export const emptySchema = z.object({
   body: z.object({}).optional(),
@@ -13,8 +17,8 @@ export const emptySchema = z.object({
 export const updateProfileSchema = z.object({
   body: z.object({
     username: usernameSchema,
-    email: z.string().email(),
-    bio: z.string().max(280).nullable().optional(),
+    email: emailSchema,
+    bio: bioSchema,
   }),
   params: z.object({}).optional(),
   query: z.object({}).optional(),
@@ -53,10 +57,7 @@ export const getAvatarObjectViewSchema = z.object({
 });
 
 export const changePasswordSchema = z.object({
-  body: z.object({
-    current_password: passwordSchema,
-    new_password: passwordSchema,
-  }),
+  body: changePasswordBodySchema,
   params: z.object({}).optional(),
   query: z.object({}).optional(),
 });
