@@ -13,8 +13,7 @@ import {
   type LoginFormData,
 } from '../../shared/validation/auth.schemas';
 import { authService } from '../../shared/services/auth.service';
-import { getGeneralErrorMessage } from '../../shared/utils/error-mapper';
-import type { ApiError } from '../../shared/api/response';
+import { AppError } from '../../shared/errors/AppError';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -52,11 +51,10 @@ export default function LoginPage() {
       toast.success('Welcome back. Ready to play?');
       navigate(fromPath, { replace: true });
     } catch (err) {
-      const apiError = err as ApiError;
+      const error = err as AppError;
       setError('root', {
-        message: getGeneralErrorMessage(apiError),
+        message: error.message,
       });
-      toast.error('Login failed. Check your credentials.');
     }
   };
 

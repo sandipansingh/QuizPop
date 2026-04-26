@@ -2,17 +2,27 @@ import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import { getRedisClient, isRedisReady } from '../cache/redis.client.js';
 import { env } from '../config/env.js';
+import { ErrorCodes } from '../utils/error-codes.js';
 
-const DEFAULT_MESSAGE = {
+const buildRateLimitMessage = (message) => ({
   success: false,
-  message: 'Too many requests. Please retry later.',
-};
+  message,
+  data: null,
+  meta: {
+    code: ErrorCodes.RATE_LIMIT_EXCEEDED,
+    timestamp: new Date().toISOString(),
+  },
+});
 
-const buildLimiter = ({ redisPrefix, ...baseOptions }) => {
+const buildLimiter = ({ redisPrefix, message: rawMessage, ...baseOptions }) => {
+  const message = buildRateLimitMessage(
+    rawMessage ?? 'Too many requests. Please retry later.'
+  );
+
   const memoryLimiter = rateLimit({
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: DEFAULT_MESSAGE,
+    message,
     ...baseOptions,
   });
 
@@ -28,7 +38,7 @@ const buildLimiter = ({ redisPrefix, ...baseOptions }) => {
       redisLimiter = rateLimit({
         standardHeaders: 'draft-8',
         legacyHeaders: false,
-        message: DEFAULT_MESSAGE,
+        message,
         passOnStoreError: true,
         validate: {
           creationStack: false,
@@ -55,10 +65,7 @@ export const authRegisterLimiter = buildLimiter({
   redisPrefix: 'rl:auth:register:',
   windowMs: env.AUTH_REGISTER_RATE_LIMIT_WINDOW_MS,
   limit: env.AUTH_REGISTER_RATE_LIMIT_MAX,
-  message: {
-    success: false,
-    message: 'Too many register attempts. Please retry later.',
-  },
+  message: 'Too many register attempts. Please retry later.',
 });
 
 export const authLoginLimiter = buildLimiter({
@@ -67,28 +74,19 @@ export const authLoginLimiter = buildLimiter({
   limit: env.AUTH_LOGIN_RATE_LIMIT_MAX,
   skipSuccessfulRequests: true,
   keyGenerator: (req) => ipKeyGenerator(req.ip, 56),
-  message: {
-    success: false,
-    message: 'Too many failed login attempts. Please retry later.',
-  },
+  message: 'Too many failed login attempts. Please retry later.',
 });
 
 export const authTokenLimiter = buildLimiter({
   redisPrefix: 'rl:auth:token:',
   windowMs: env.AUTH_TOKEN_RATE_LIMIT_WINDOW_MS,
   limit: env.AUTH_TOKEN_RATE_LIMIT_MAX,
-  message: {
-    success: false,
-    message: 'Too many token actions. Please retry later.',
-  },
+  message: 'Too many token actions. Please retry later.',
 });
 
 export const sensitiveWriteLimiter = buildLimiter({
   redisPrefix: 'rl:sensitive:',
   windowMs: env.SENSITIVE_WRITE_RATE_LIMIT_WINDOW_MS,
   limit: env.SENSITIVE_WRITE_RATE_LIMIT_MAX,
-  message: {
-    success: false,
-    message: 'Too many write operations. Please retry later.',
-  },
+  message: 'Too many write operations. Please retry later.',
 });

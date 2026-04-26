@@ -33,6 +33,12 @@ const attachRoomListeners = (socket: Socket, set: SetFn) => {
   socket.on(socketEvents.disconnect, () => {
     set({ isSocketConnected: false });
   });
+  socket.on('connect_error', (err: Error) => {
+    set({
+      isSocketConnected: false,
+      errorMessage: err.message ?? 'Connection failed.',
+    });
+  });
   socket.on(
     socketEvents.joinRoom,
     (payload: { room_id?: string; players?: RoomPlayer[] }) => {
@@ -161,6 +167,7 @@ export const attachSocketListeners = (
   [
     socketEvents.connect,
     socketEvents.disconnect,
+    'connect_error',
     socketEvents.joinRoom,
     socketEvents.leaveRoom,
     socketEvents.gameStarted,
